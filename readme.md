@@ -1,6 +1,6 @@
 Drive WS2812 neopixels using the SMI of the raspberry pi (in progress).
 
-Based on github.com/jbentham/rpi and github.com/hhromic/libe131
+Based on github.com/jbentham/rpi
 
 Pre-requisites
 ==============
