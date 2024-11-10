@@ -185,7 +185,7 @@ void gpio_out(int pin, int val);
 uint8_t gpio_in(int pin);
 int open_mbox(void);
 void close_mbox(int fd);
-uint32_t msg_mbox(int fd, VC_MSG *msgp);
+PTR_TYPE msg_mbox(int fd, VC_MSG *msgp);
 void *map_segment(void *addr, int size);
 void unmap_segment(void *addr, int size);
 uint32_t alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags);
@@ -367,7 +367,7 @@ void close_mbox(int fd)
 }
 
 // Send message to mailbox, return first response int, 0 if error
-uint32_t msg_mbox(int fd, VC_MSG *msgp)
+PTR_TYPE msg_mbox(int fd, VC_MSG *msgp)
 {
     uint32_t ret=0, i;
 
@@ -390,7 +390,7 @@ uint32_t msg_mbox(int fd, VC_MSG *msgp)
 }
 
 // Allocate memory on PAGE_SIZE boundary, return handle
-uint32_t alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags)
+PTR_TYPE alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags)
 {
     VC_MSG msg={.tag=0x3000c, .blen=12, .dlen=12,
         .uints={PAGE_ROUNDUP(size), PAGE_SIZE, flags}};
@@ -403,13 +403,13 @@ void *lock_vc_mem(int fd, int h)
     return(h ? (void *)msg_mbox(fd, &msg) : 0);
 }
 // Unlock allocated memory
-uint32_t unlock_vc_mem(int fd, int h)
+PTR_TYPE unlock_vc_mem(int fd, int h)
 {
     VC_MSG msg={.tag=0x3000e, .blen=4, .dlen=4, .uints={h}};
     return(h ? msg_mbox(fd, &msg) : 0);
 }
 // Free memory
-uint32_t free_vc_mem(int fd, int h)
+PTR_TYPE free_vc_mem(int fd, int h)
 {
     VC_MSG msg={.tag=0x3000f, .blen=4, .dlen=4, .uints={h}};
     return(h ? msg_mbox(fd, &msg) : 0);

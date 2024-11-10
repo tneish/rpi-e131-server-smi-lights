@@ -15,6 +15,14 @@
 // limitations under the License.
 //
 
+// Define a macro to select pointer size
+#if defined(__aarch64__)
+    #define PTR_TYPE uint64_t
+#else
+    #define PTR_TYPE uint32_t
+#endif
+
+
 // Location of peripheral registers in physical memory
 #define PHYS_REG_BASE   PI_01_REG_BASE
 #define PI_01_REG_BASE  0x20000000  // Pi Zero or 1
@@ -49,14 +57,17 @@ typedef struct {
 } MEM_MAP;
 
 // Get virtual 8 and 32-bit pointers to register
-#define REG8(m, x)  ((volatile uint8_t *) ((uint32_t)(m.virt)+(uint32_t)(x)))
-#define REG32(m, x) ((volatile uint32_t *)((uint32_t)(m.virt)+(uint32_t)(x)))
+//#define REG8(m, x)  ((volatile uint8_t *) ((uint64_t)(m.virt)+(uint64_t)(x)))
+//#define REG32(m, x) ((volatile uint32_t *)((uint64_t)(m.virt)+(uint64_t)(x)))
+#define REG8(m, x)  ((volatile uint8_t *) ((PTR_TYPE)(m.virt)+(PTR_TYPE)(x)))
+#define REG32(m, x) ((volatile uint32_t *)((PTR_TYPE)(m.virt)+(PTR_TYPE)(x)))
+
 // Get bus address of register
-#define REG_BUS_ADDR(m, x)  ((uint32_t)(m.bus)  + (uint32_t)(x))
+#define REG_BUS_ADDR(m, x)  ((PTR_TYPE)(m.bus)  + (PTR_TYPE)(x))
 // Convert uncached memory virtual address to bus address
-#define MEM_BUS_ADDR(mp, a) ((uint32_t)a-(uint32_t)mp->virt+(uint32_t)mp->bus)
+#define MEM_BUS_ADDR(mp, a) ((PTR_TYPE)a-(PTR_TYPE)mp->virt+(PTR_TYPE)mp->bus)
 // Convert bus address to physical address (for mmap)
-#define BUS_PHYS_ADDR(a)    ((void *)((uint32_t)(a)&~0xC0000000))
+#define BUS_PHYS_ADDR(a)    ((void *)((PTR_TYPE)(a)&~0xC0000000))
 
 // GPIO register definitions
 #define GPIO_BASE       (PHYS_REG_BASE + 0x200000)
@@ -180,13 +191,13 @@ uint8_t gpio_in(int pin);
 void disp_mode_vals(uint32_t mode);
 int open_mbox(void);
 void close_mbox(int fd);
-uint32_t msg_mbox(int fd, VC_MSG *msgp);
+PTR_TYPE msg_mbox(int fd, VC_MSG *msgp);
 void *map_segment(void *addr, int size);
 void unmap_segment(void *addr, int size);
-uint32_t alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags);
+PTR_TYPE alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags);
 void *lock_vc_mem(int fd, int h);
-uint32_t unlock_vc_mem(int fd, int h);
-uint32_t free_vc_mem(int fd, int h);
+PTR_TYPE unlock_vc_mem(int fd, int h);
+PTR_TYPE free_vc_mem(int fd, int h);
 uint32_t set_vc_clock(int fd, int id, uint32_t freq);
 void disp_vc_msg(VC_MSG *msgp);
 void enable_dma(int chan);
