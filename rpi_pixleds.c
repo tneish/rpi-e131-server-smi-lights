@@ -38,8 +38,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include "rpi_dma_utils.h"
 #include "rpi_smi_defs.h"
+
 
 #if PHYS_REG_BASE==PI_4_REG_BASE        // Timings for RPi v4 (1.5 GHz)
 #define SMI_TIMING       10, 15, 30, 15    // 400 ns cycle time
@@ -160,6 +162,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, terminate);
     map_devices();
     init_smi(LED_NCHANS>8 ? SMI_16_BITS : SMI_8_BITS, SMI_TIMING);
+    printf("map_uncached_mem(%" PRIu64 ", %d)\n", &vc_mem, VC_MEM_SIZE);
     map_uncached_mem(&vc_mem, VC_MEM_SIZE);
 #if TX_TEST
     oset = oset;
@@ -194,6 +197,7 @@ int main(int argc, char *argv[])
 #if LED_NCHANS <= 8
             swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
 #endif
+            printf("TX_BUFF_SIZE(chan_ledcount) = %d\n", TX_BUFF_SIZE(chan_ledcount));
             memcpy(txdata, tx_buffer, TX_BUFF_SIZE(chan_ledcount));
             start_smi(&vc_mem);
             usleep(CHASE_MSEC * 1000);

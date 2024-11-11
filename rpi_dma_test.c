@@ -26,17 +26,27 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include "pi_hw/pi_util.h"
+#include "pi_hw/mailbox.h"
+
+// Define a macro to select pointer size
+#if defined(__aarch64__)
+    #define PTR_TYPE uint64_t
+#else
+    #define PTR_TYPE uint32_t
+#endif
 
 // Location of peripheral registers in physical memory
-//#define PHYS_REG_BASE  0x20000000  // Pi Zero or 1
-#define PHYS_REG_BASE    0x3F000000  // Pi 2 or 3
-//#define PHYS_REG_BASE  0xFE000000  // Pi 4
+#define PHYS_REG_BASE   PI_4_REG_BASE
+#define PI_01_REG_BASE  0x20000000  // Pi Zero or 1
+#define PI_23_REG_BASE  0x3F000000  // Pi 2 or 3
+#define PI_4_REG_BASE   0xFE000000  // Pi 4
 
 // Location of peripheral registers in bus memory
 #define BUS_REG_BASE    0x7E000000
 
 // If non-zero, print debug information
-#define DEBUG           0
+#define DEBUG           1
 
 // Output pin to use for LED
 //#define LED_PIN         47    // Pi Zero onboard LED
@@ -63,8 +73,8 @@
 #define GPIO_SET0       0x1c
 #define GPIO_CLR0       0x28
 #define GPIO_LEV0       0x34
-#define VIRT_GPIO_REG(a) ((uint32_t *)((uint32_t)virt_gpio_regs + (a)))
-#define BUS_GPIO_REG(a) (GPIO_BASE-PHYS_REG_BASE+BUS_REG_BASE+(uint32_t)(a))
+#define VIRT_GPIO_REG(a) ((uint32_t *)((PTR_TYPE)virt_gpio_regs + (a)))
+#define BUS_GPIO_REG(a) (GPIO_BASE-PHYS_REG_BASE+BUS_REG_BASE+(PTR_TYPE)(a))
 #define GPIO_IN         0
 #define GPIO_OUT        1
 #define GPIO_ALT0       4
@@ -73,14 +83,75 @@
 #define GPIO_ALT4       3
 #define GPIO_ALT5       2
 
+
+
+#define GPIO_BASE_OFFSET	0x00200000
+#define DMA_BASE_OFFSET		0x00007000
+#define DMA_CHAN_SIZE		0x100
+#define DMA_CHAN_MIN		0
+#define DMA_CHAN_MAX		14
+
+/*
+#define DMA_NO_WIDE_BURSTS	(1<<26)
+#define DMA_WAIT_RESP		(1<<3)
+#define DMA_D_DREQ		(1<<6)
+#define DMA_PER_MAP(x)		((x)<<16)
+#define DMA_END			(1<<1)
+#define DMA_RESET		(1<<31)
+#define DMA_INT			(1<<2)
+#define DMA_SRC_IGNORE		(1<<11)
+#define DMA_TDMODE		(1<<1)
+
+
+#define DMA_CS			(0x00/4)
+#define DMA_CONBLK_AD		(0x04/4)
+#define DMA_SOURCE_AD		(0x0c/4)
+#define DMA_DEBUG		(0x20/4)*/
+
+#define PWM_BASE_OFFSET		0x0020C000
+#define PWM_LEN			0x28
+#define PCM_BASE_OFFSET		0x00203000
+#define PCM_LEN			0x24
+
+/*
+#define PWM_CTL			(0x00/4)
+#define PWM_STA			(0x04/4)
+#define PWM_DMAC		(0x08/4)
+#define PWM_RNG1		(0x10/4)
+#define PWM_FIFO		(0x18/4)
+#define PWMCTL_MODE1		(1<<1)
+#define PWMCTL_PWEN1		(1<<0)
+#define PWMCTL_CLRF		(1<<6)
+#define PWMCTL_USEF1		(1<<5)
+
+#define PWMDMAC_ENAB		(1<<31)
+#define PWMDMAC_THRSHLD		((15<<8)|(15<<0))
+
+#define PCM_CS_A		(0x00/4)
+#define PCM_FIFO_A		(0x04/4)
+#define PCM_MODE_A		(0x08/4)
+#define PCM_RXC_A		(0x0c/4)
+#define PCM_TXC_A		(0x10/4)
+#define PCM_DREQ_A		(0x14/4)
+#define PCM_INTEN_A		(0x18/4)
+#define PCM_INT_STC_A		(0x1c/4)
+#define PCM_GRAY		(0x20/4)
+
+#define PCMCLK_CNTL		38
+#define PCMCLK_DIV		39*/
+
+
+
 // Virtual memory pointers to acceess GPIO, DMA and PWM from user space
-void *virt_gpio_regs, *virt_dma_regs, *virt_pwm_regs;
+//void *virt_gpio_regs, *virt_dma_regs, *virt_pwm_regs;
 // VC mailbox file descriptor & handle, and bus memory pointer
 int mbox_fd, dma_mem_h;
-void *bus_dma_mem;
+uint32_t bus_dma_mem;
 
 // Convert memory bus address to physical address (for mmap)
-#define BUS_PHYS_ADDR(a) ((void *)((uint32_t)(a)&~0xC0000000))
+//#define BUS_PHYS_ADDR(a) (((uint32_t)(a)&~0xC0000000))
+#define BUS_PHYS_ADDR(a) ((a)&~0xC0000000)
+#define BUS_TO_PHYS(x) ((x)&~0xC0000000)
 
 // Videocore mailbox memory allocation flags, see:
 //     https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
@@ -121,7 +192,7 @@ typedef struct {
 #define DMA_NEXTCONBK   (DMA_CHAN*0x100 + 0x1c)
 #define DMA_DEBUG       (DMA_CHAN*0x100 + 0x20)
 #define DMA_ENABLE      0xff0
-#define VIRT_DMA_REG(a) ((volatile uint32_t *)((uint32_t)virt_dma_regs + a))
+#define VIRT_DMA_REG(a) ((volatile uint64_t *)(virt_dma_regs + a))
 char *dma_regstrs[] = {"DMA CS", "CB_AD", "TI", "SRCE_AD", "DEST_AD",
     "TFR_LEN", "STRIDE", "NEXT_CB", "DEBUG", ""};
 
@@ -143,7 +214,7 @@ typedef struct {
 void *virt_dma_mem;
 
 // Convert virtual DMA data address to a bus address
-#define BUS_DMA_MEM(a)  ((uint32_t)a-(uint32_t)virt_dma_mem+(uint32_t)bus_dma_mem)
+#define BUS_DMA_MEM(a)  ((PTR_TYPE)a-(PTR_TYPE)virt_dma_mem+(PTR_TYPE)bus_dma_mem)
 
 // PWM controller
 #define PWM_BASE        (PHYS_REG_BASE + 0x20C000)
@@ -155,8 +226,8 @@ void *virt_dma_mem;
 #define PWM_FIF1        0x18   // Channel 1 fifo
 #define PWM_RNG2        0x20   // Channel 2 range
 #define PWM_DAT2        0x24   // Channel 2 data
-#define VIRT_PWM_REG(a) ((volatile uint32_t *)((uint32_t)virt_pwm_regs + (a)))
-#define BUS_PWM_REG(a)  (PWM_BASE-PHYS_REG_BASE+BUS_REG_BASE+(uint32_t)(a))
+#define VIRT_PWM_REG(a) ((volatile uint32_t *)((PTR_TYPE)virt_pwm_regs + (a)))
+#define BUS_PWM_REG(a)  (PWM_BASE-PHYS_REG_BASE+BUS_REG_BASE+(PTR_TYPE)(a))
 #define PWM_CTL_RPTL1   (1<<2)  // Chan 1: repeat last data when FIFO empty
 #define PWM_CTL_USEF1   (1<<5)  // Chan 1: use FIFO
 #define PWM_DMAC_ENAB   (1<<31) // Start PWM DMA
@@ -169,9 +240,10 @@ void *virt_clk_regs;
 #define CLK_BASE        (PHYS_REG_BASE + 0x101000)
 #define CLK_PWM_CTL     0xa0
 #define CLK_PWM_DIV     0xa4
-#define VIRT_CLK_REG(a) ((volatile uint32_t *)((uint32_t)virt_clk_regs + (a)))
+#define VIRT_CLK_REG(a) ((volatile uint32_t *)((PTR_TYPE)virt_clk_regs + (a)))
 #define CLK_PASSWD      0x5a000000
-#define CLOCK_KHZ       250000
+//#define CLOCK_KHZ       250000
+#define CLOCK_KHZ       375000
 #define PWM_CLOCK_ID    0xa
 
 #define FAIL(x) {printf(x); terminate(0);}
@@ -185,11 +257,11 @@ void gpio_out(int pin, int val);
 uint8_t gpio_in(int pin);
 int open_mbox(void);
 void close_mbox(int fd);
-PTR_TYPE msg_mbox(int fd, VC_MSG *msgp);
-void *map_segment(void *addr, int size);
+uint32_t msg_mbox(int fd, VC_MSG *msgp);
+void *map_segment(uint32_t addr, int size);
 void unmap_segment(void *addr, int size);
 uint32_t alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags);
-void *lock_vc_mem(int fd, int h);
+uint32_t lock_vc_mem(int fd, int h);
 uint32_t unlock_vc_mem(int fd, int h);
 uint32_t free_vc_mem(int fd, int h);
 uint32_t set_vc_clock(int fd, int id, uint32_t freq);
@@ -202,30 +274,50 @@ void init_pwm(int freq);
 void start_pwm(void);
 void stop_pwm(void);
 
+volatile uint64_t* virt_gpio_regs, *virt_dma_regs, *virt_pwm_regs;
+struct phys* dma_mem;
+
 // Main program
 int main(int argc, char *argv[])
 {
     // Ensure cleanup if user hits ctrl-C
     signal(SIGINT, terminate);
+    
+    struct board_cfg board = {0};
+    get_model_and_revision(&board);
+
 
     // Map GPIO, DMA and PWM registers into virtual mem (user space)
-    virt_gpio_regs = map_segment((void *)GPIO_BASE, PAGE_SIZE);
-    virt_dma_regs = map_segment((void *)DMA_BASE, PAGE_SIZE);
-    virt_pwm_regs = map_segment((void *)PWM_BASE, PAGE_SIZE);
-    virt_clk_regs = map_segment((void *)CLK_BASE, PAGE_SIZE);
-    enable_dma();
+    virt_dma_regs = map_peripheral(board.periph_virt_base + DMA_BASE_OFFSET, PAGE_SIZE);
+    virt_gpio_regs = map_peripheral(board.periph_virt_base + GPIO_BASE_OFFSET, PAGE_SIZE);
+    virt_pwm_regs = map_peripheral(board.periph_virt_base + PWM_BASE_OFFSET, PAGE_SIZE);
+
+    /*virt_gpio_regs = map_segment(GPIO_BASE, PAGE_SIZE);
+    virt_dma_regs = map_segment(DMA_BASE, PAGE_SIZE);
+    virt_pwm_regs = map_segment(PWM_BASE, PAGE_SIZE);
+    virt_clk_regs = map_segment(CLK_BASE, PAGE_SIZE);*/
+    //enable_dma();
 
     // Set LED pin as output, and set high
     gpio_mode(LED_PIN, GPIO_OUT);
     gpio_out(LED_PIN, 1);
 
     // Use mailbox to get uncached memory for DMA decriptors and buffers
-    mbox_fd = open_mbox();
-    if ((dma_mem_h = alloc_vc_mem(mbox_fd, DMA_MEM_SIZE, DMA_MEM_FLAGS)) <= 0 ||
+    //mbox_fd = open_mbox();
+    mbox_fd = mbox_open();
+    
+    
+    
+    /*if ((dma_mem_h = alloc_vc_mem(mbox_fd, DMA_MEM_SIZE, DMA_MEM_FLAGS)) <= 0 ||
         (bus_dma_mem = lock_vc_mem(mbox_fd, dma_mem_h)) == 0 ||
         (virt_dma_mem = map_segment(BUS_PHYS_ADDR(bus_dma_mem), DMA_MEM_SIZE)) == 0)
-            FAIL("Error: can't allocate uncached memory\n");
-    printf("VC mem handle %u, phys %p, virt %p\n", dma_mem_h, bus_dma_mem, virt_dma_mem);
+            FAIL("Error: can't allocate uncached memory\n");*/
+            
+    dma_mem = phys_alloc(&board, DMA_MEM_SIZE);
+
+    //printf("VC mem handle %u, phys %p, virt %p\n", dma_mem_h, bus_dma_mem, virt_dma_mem);
+    printf("VC mem handle %u, size %u, phys %p, virt %p, bus %p\n", dma_mem->handle, dma_mem->size, dma_mem->phys_addr, dma_mem->virt_addr, dma_mem->bus_addr);
+    
 
     // Run DMA tests
     dma_test_mem_transfer();
@@ -234,18 +326,21 @@ int main(int argc, char *argv[])
     terminate(0);
 }
 
+
 // DMA memory-to-memory test
 int dma_test_mem_transfer(void)
 {
-    DMA_CB *cbp = virt_dma_mem;
+    DMA_CB *cbp = (void*)dma_mem->virt_addr;
     char *srce = (char *)(cbp+1);
     char *dest = srce + 0x100;
 
     strcpy(srce, "memory transfer OK");
     memset(cbp, 0, sizeof(DMA_CB));
     cbp->ti = DMA_CB_SRC_INC | DMA_CB_DEST_INC;
-    cbp->srce_ad = BUS_DMA_MEM(srce);
-    cbp->dest_ad = BUS_DMA_MEM(dest);
+    //cbp->srce_ad = BUS_DMA_MEM(srce);
+    cbp->srce_ad = phys_virt_to_bus(dma_mem, srce);
+    //cbp->dest_ad = BUS_DMA_MEM(dest);
+    cbp->dest_ad = phys_virt_to_bus(dma_mem, dest);
     cbp->tfr_len = strlen(srce) + 1;
     start_dma(cbp);
     usleep(10);
@@ -367,7 +462,7 @@ void close_mbox(int fd)
 }
 
 // Send message to mailbox, return first response int, 0 if error
-PTR_TYPE msg_mbox(int fd, VC_MSG *msgp)
+uint32_t msg_mbox(int fd, VC_MSG *msgp)
 {
     uint32_t ret=0, i;
 
@@ -390,26 +485,26 @@ PTR_TYPE msg_mbox(int fd, VC_MSG *msgp)
 }
 
 // Allocate memory on PAGE_SIZE boundary, return handle
-PTR_TYPE alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags)
+uint32_t alloc_vc_mem(int fd, uint32_t size, VC_ALLOC_FLAGS flags)
 {
     VC_MSG msg={.tag=0x3000c, .blen=12, .dlen=12,
         .uints={PAGE_ROUNDUP(size), PAGE_SIZE, flags}};
     return(msg_mbox(fd, &msg));
 }
 // Lock allocated memory, return bus address
-void *lock_vc_mem(int fd, int h)
+uint32_t lock_vc_mem(int fd, int h)
 {
     VC_MSG msg={.tag=0x3000d, .blen=4, .dlen=4, .uints={h}};
-    return(h ? (void *)msg_mbox(fd, &msg) : 0);
+    return(h ? msg_mbox(fd, &msg) : 0);
 }
 // Unlock allocated memory
-PTR_TYPE unlock_vc_mem(int fd, int h)
+uint32_t unlock_vc_mem(int fd, int h)
 {
     VC_MSG msg={.tag=0x3000e, .blen=4, .dlen=4, .uints={h}};
     return(h ? msg_mbox(fd, &msg) : 0);
 }
 // Free memory
-PTR_TYPE free_vc_mem(int fd, int h)
+uint32_t free_vc_mem(int fd, int h)
 {
     VC_MSG msg={.tag=0x3000f, .blen=4, .dlen=4, .uints={h}};
     return(h ? msg_mbox(fd, &msg) : 0);
@@ -440,7 +535,7 @@ void disp_vc_msg(VC_MSG *msgp)
 // ----- VIRTUAL MEMORY -----
 
 // Get virtual memory segment for peripheral regs or physical mem
-void *map_segment(void *addr, int size)
+void *map_segment(uint32_t addr, int size)
 {
     int fd;
     void *mem;
@@ -448,7 +543,7 @@ void *map_segment(void *addr, int size)
     size = PAGE_ROUNDUP(size);
     if ((fd = open ("/dev/mem", O_RDWR|O_SYNC|O_CLOEXEC)) < 0)
         FAIL("Error: can't open /dev/mem, run using sudo\n");
-    mem = mmap(0, size, PROT_WRITE|PROT_READ, MAP_SHARED, fd, (uint32_t)addr);
+    mem = mmap(0, size, PROT_WRITE|PROT_READ, MAP_SHARED, fd, addr);
     close(fd);
 #if DEBUG
     printf("Map %p -> %p\n", (void *)addr, mem);
