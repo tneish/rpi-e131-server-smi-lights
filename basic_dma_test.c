@@ -47,18 +47,25 @@ int main() {
 	
 	m->mbox_fd = mbox_open();
 	dma_mem_alloc(4096, m);
+	
+	// Works...
 	for (int i = 0; i < m->size; i++) {
 		printf("%d\n", i);
 		memset(m->virt_addr+i, 40, 1);
 		
 	}
 	
-	
-	// OK!
+	// Also works..
 	memset(m->virt_addr, 40, 128);
-	// Too large write burst for the AXI bus.. (BCM2711 ARM Peripherals page 63)
-	memset(m->virt_addr, 40, 129);
 	
+	// Doesn't work..
+	//memset(m->virt_addr, 40, 129);
+	
+	// Works..
+	strcpy(m->virt_addr, "12345");
+	
+	// Doesn't work..
+	strcpy(m->virt_addr, "123456");
 	
 	dma_mem_release(m);
 	
