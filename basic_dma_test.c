@@ -1,51 +1,50 @@
+/*- memset:
+ * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
-#include "bcm_host.h"
-#include "mailbox.h"
+#include <stdlib.h>
+//#include "bcm_host.h"
+
+#include "mem_utils.h"
 
 
-#define BUS_TO_PHYS(x) ((x)&~0xC0000000)
 
-
-typedef struct {
-	int mbox_fd;
-	unsigned handle;
-	size_t size;
-	uint32_t bus_addr;
-	void *virt_addr;
-	
-	
-} dma_mem_t;
-
-
-int dma_mem_alloc (size_t size, dma_mem_t *d) {
-	int mbox_fd = d->mbox_fd;
-	unsigned handle, mem_flg = 0x4;
-	
-	handle = mem_alloc(mbox_fd, size, 4096, mem_flg);
-
-	d->size = size;
-	d->bus_addr = mem_lock(mbox_fd, handle);
-	d->virt_addr = mapmem(BUS_TO_PHYS(d->bus_addr), size);
-	
-}
-
-void dma_mem_release(dma_mem_t* d) {
-	int mbox_fd = d->mbox_fd;
-	unsigned handle = d->handle;
-	size_t size = d->size;
-	
-    unmapmem((void*)d->virt_addr, size);
-    mem_unlock(mbox_fd, handle);
-    mem_free(mbox_fd, handle);
-	
-}
 
 int main() {
 	dma_mem_t *m = calloc(1, sizeof(dma_mem_t));
-	
-	m->mbox_fd = mbox_open();
+
 	dma_mem_alloc(4096, m);
 	
 	// Works...
@@ -55,11 +54,11 @@ int main() {
 		
 	}
 	
-	// Also works..
+	// Works <= 128B
 	memset(m->virt_addr, 40, 128);
 	
-	// Doesn't work..
-	//memset(m->virt_addr, 40, 129);
+	// Needs 'safe' memset to avoid cache
+	dm_safe_memset(m->virt_addr, 40, 129);
 	
 	// Works..
 	strcpy(m->virt_addr, "12345");
