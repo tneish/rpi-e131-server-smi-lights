@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mailbox.h"
 
-#define PAGE_SIZE (4*1024)
+
 
 #define DEBUG 1
 
@@ -94,6 +94,7 @@ static int mbox_property(int file_desc, void *buf)
 
    if (ret_val < 0) {
       int errsv = errno;
+      assert(0);
       fprintf(stderr, "ioctl_set_msg failed:%s\n", strerror(errsv));
    }
 
@@ -104,6 +105,27 @@ static int mbox_property(int file_desc, void *buf)
 #endif
    return ret_val;
 }
+
+unsigned get_dma_channels(int file_desc) 
+{
+   int i=0;
+   unsigned p[32];
+   p[i++] = 0; // size
+   p[i++] = 0x00000000; // process request
+   
+   p[i++] = 0x60001; // (the tag id)
+   p[i++] = 4; // (size of the buffer in bytes)
+   p[i++] = 0; // (req/rsp code)
+   p[i++] = 0; // value buffer
+   
+   p[i++] = 0x00000000; // end tag
+   p[0] = i*sizeof *p; // actual size
+
+   mbox_property(file_desc, p);
+   return p[5];
+
+}
+
 
 unsigned mem_alloc(int file_desc, unsigned size, unsigned align, unsigned flags)
 {
@@ -117,7 +139,7 @@ unsigned mem_alloc(int file_desc, unsigned size, unsigned align, unsigned flags)
    p[i++] = 12; // (size of the data)
    p[i++] = size; // (num bytes? or pages?)
    p[i++] = align; // (alignment)
-   p[i++] = flags; // (MEM_FLAG_L1_NONALLOCATING)
+   p[i++] = flags; 
 
    p[i++] = 0x00000000; // end tag
    p[0] = i*sizeof *p; // actual size

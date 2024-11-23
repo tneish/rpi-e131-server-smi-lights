@@ -7,6 +7,9 @@ Note (!!) RPi 5 does not have SMI.
 Pre-requisites
 ==============
 
+
+
+
 ## Update base address for peripheral physical memory to match RPi variant
 In `rpi_dma_utils.h`:
 ```
@@ -16,3 +19,10 @@ In `rpi_dma_utils.h`:
 #define PI_23_REG_BASE  0x3F000000  // Pi 2 or 3
 #define PI_4_REG_BASE   0xFE000000  // Pi 4
 ```
+
+
+Troubleshooting
+===============
+
+Check ARM is in "Low Peripheral mode" (default).
+/boot/firmware/config.txt should not have arm_peri_high=1
