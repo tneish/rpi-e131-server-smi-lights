@@ -38,8 +38,7 @@ void get_model_and_revision(struct board_cfg *board)
 	board->periph_virt_base = bcm_host_get_peripheral_address();
 	board->dram_phys_base = bcm_host_get_sdram_address();
 	board->periph_virt_size = bcm_host_get_peripheral_size();
-	//board->periph_phys_base = 0x7e000000;
-	board->periph_phys_base = 0x7c000000; // in BCM2711 peripherals datasheet page 5.
+	board->periph_phys_base = 0x7e000000; 
 	
 	if (DEBUG) {
 		printf("board {mem_flag: 0x%08X, periph_virt_base: 0x%08X, dram_phys_base: 0x%08X, periph_virt_size: 0x%08X, periph_phys_base: 0x%08X }\n",

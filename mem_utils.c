@@ -56,22 +56,22 @@
 
 #include "mem_utils.h"
 
-/*#define DMA_CS			(0x00/4)
-#define DMA_CONBLK_AD		(0x04/4)
-#define DMA_DEBUG		(0x20/4)
-#define DMA_ENABLE      0xff0
-* */
 
-
-//#define DMA_BASE_OFFSET		0x00007000
-
+// Offsets are in bytes!
 static const uint32_t dma_base_offset			= 0x7000;
-static const uint32_t dma_chan_offset			= 0x0100 * dma_chan;  
+static const uint32_t dma_chan_offset			= 0x0100 * DMA_CHAN;  
 static const uint32_t dma_enable_offset			= 0x0ff0;
 
 static const uint32_t dma_reg_offset_cs 		= 0x00;
 static const uint32_t dma_reg_offset_conblk_ad 	= 0x04;
 static const uint32_t dma_reg_offset_debug		= 0x20;
+
+static const uint32_t gpio_base_offset			= 0x200000;
+static const uint32_t gpio_reg_offset_fsel0		= 0x00;
+static const uint32_t gpio_reg_offset_set0		= 0x1c;
+static const uint32_t gpio_reg_offset_clear0	= 0x28;
+
+
 
 
 #define DEBUG 1
@@ -81,9 +81,14 @@ static struct board_cfg _board = {0};
 
 static volatile uint32_t *virt_periph_regs;
 static volatile uint32_t *virt_dma_regs;
+static volatile uint32_t *virt_gpio_regs;
 
 static inline uint32_t dma_mem_bus_to_phys(uint32_t b) {
 	return (b)&~_board.dram_phys_base;
+}
+
+uint32_t dma_mem_virt_to_bus(dma_mem_t *m) {
+	return m->bus_addr;
 }
 
 uint32_t dma_mem_virt_offset_to_bus(dma_mem_t *m, void *virt) {
@@ -96,6 +101,43 @@ volatile uint32_t *reg32_offset(uintptr_t base, unsigned offset) {
 	
 }
 
+uint32_t gpio_bus_clear0() {
+	return _board.periph_phys_base + gpio_base_offset + gpio_reg_offset_clear0;
+}
+
+uint32_t gpio_bus_set0() {
+	return _board.periph_phys_base + gpio_base_offset + gpio_reg_offset_set0;
+}
+
+
+// ----- GPIO -----
+
+// Set input or output
+void set_gpio_mode(int pin, int mode) {
+	volatile uint32_t *reg = reg32_offset((uintptr_t)virt_gpio_regs, 
+								gpio_reg_offset_fsel0) + pin / 10;
+	unsigned shift = (pin % 10) * 3;
+	
+	*reg = (*reg & ~(7 << shift)) | (mode << shift);
+}
+
+void set_gpio_mode_out(int pin) {
+	set_gpio_mode(pin, 1);
+}
+
+void set_gpio_mode_in(int pin) {
+	set_gpio_mode(pin, 0);
+}
+
+// Set an O/P pin
+void set_gpio_out(int pin, int val) {
+	volatile uint32_t *reg = reg32_offset((uintptr_t)virt_gpio_regs, 
+								val ? gpio_reg_offset_set0 : gpio_reg_offset_clear0) 
+								+ pin / 32;
+    *reg = 1 << (pin % 32);
+}
+
+
 void mem_utils_init() {
 	static int initialized = 0;
 	if (initialized > 0) return;
@@ -104,10 +146,14 @@ void mem_utils_init() {
 	get_model_and_revision(&_board);
 	virt_periph_regs = mapmem(_board.periph_virt_base, _board.periph_virt_size);
 	virt_dma_regs = (volatile uint32_t *)((uintptr_t)virt_periph_regs + dma_base_offset);
+	virt_gpio_regs = (volatile uint32_t *)((uintptr_t)virt_periph_regs + gpio_base_offset);
 	initialized = 1;
 	
 	if (DEBUG) {
-		printf("virt_periph_regs* = 0x%0LX, virt_dma_regs* = 0x%0LX.\n", virt_periph_regs, virt_dma_regs);
+		printf("virt_periph_regs* = 0x%0LX, virt_dma_regs* = 0x%0LX, virt_gpio_regs* = 0x%0LX.\n", 
+			virt_periph_regs, 
+			virt_dma_regs,
+			virt_gpio_regs);
 		
 	}
 }
@@ -123,7 +169,7 @@ void * dm_safe_memset(void *s, int c, size_t n) {
 	return (s);
 }
 
-int dma_mem_alloc (size_t size, dma_mem_t *d) {
+void dma_mem_alloc (size_t size, dma_mem_t *d) {
 	mem_utils_init();
 	
 	unsigned handle, mem_flg;
@@ -170,7 +216,7 @@ void print_free_dma_channels() {
 void enable_dma() {
 	
 	__sync_synchronize();  
-	*(reg32_offset((uintptr_t)virt_periph_regs, dma_enable_offset)) |= (1 << dma_chan);
+	*(reg32_offset((uintptr_t)virt_periph_regs, dma_enable_offset)) |= (1 << DMA_CHAN);
 	*(reg32_offset((uintptr_t)virt_dma_regs, dma_chan_offset + dma_reg_offset_cs)) = 1 << 31;
 	
 }

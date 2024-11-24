@@ -29,13 +29,20 @@ typedef struct {
 #define DMA_CB_SRC_INC  (1<<8)
 
 
-static const unsigned dma_chan 	= 5;
+static const unsigned DMA_CHAN 	= 5;
 
 
-int dma_mem_alloc (size_t size, dma_mem_t *d);
+
+/** DMA MEMORY **/
+// TODO: error checking
+void dma_mem_alloc (size_t size, dma_mem_t *d);
 void dma_mem_release(dma_mem_t *d);
-void * dm_safe_memset(void *s, int c, size_t n);
+void *dm_safe_memset(void *s, int c, size_t n);
+
 uint32_t dma_mem_virt_offset_to_bus(dma_mem_t *m, void *virt);
+uint32_t dma_mem_virt_to_bus(dma_mem_t *m);
+
+// Enable DMA channel
 void enable_dma();
 
 // Start DMA, given dma_mem_t pointer for first control block (see DMA_CB_t)
@@ -43,6 +50,16 @@ void start_dma(dma_mem_t *m);
 
 void disp_dma();
 void print_free_dma_channels();
+
+/*** GPIO **/
+void set_gpio_mode_in(int pin);
+void set_gpio_mode_out(int pin);
+void set_gpio_out(int pin, int val);
+
+// 32-bit bus address for gpio bank 0 set register
+uint32_t gpio_bus_set0();
+// 32-bit bus address for gpio bank 0 clear register
+uint32_t gpio_bus_clear0();
 
 
 
