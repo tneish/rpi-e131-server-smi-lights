@@ -1,102 +1,31 @@
 # Minimum CMake version required
 cmake_minimum_required(VERSION 3.10)
 
-# Project name
-project(rpi_neopixel_smi)
-
-# Set the C standard
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED True)
-
-# Specify the source files
-set(SOURCES 
-    rpi_pixleds.c 
-    rpi_dma_utils.c
-)
-
-# Set the build type to Debug 
-set(CMAKE_BUILD_TYPE Debug)
-
-# Set compiler flags for the Debug build type 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-
-# Add the executable
-add_executable(rpi_neopixel_smi ${SOURCES})
-
-project(dma_test)
-# Set the C standard
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED True)
-
-# Specify the source files
-set(TESTSOURCES
-	rpi_dma_test.c
-	pi_hw/pi_util.c
-	pi_hw/mailbox.c
-)
-# Set the build type to Debug 
-set(CMAKE_BUILD_TYPE Debug)
-
-# Set compiler flags for the Debug build type 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-
-
-# Add the executable
-add_executable(rpi_dma_test ${TESTSOURCES})
-
-target_link_libraries(rpi_dma_test bcm_host)
-
-
 project(basic_dma_test)
-# Set the C standard
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED True)
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Specify the source files
 set(BASICTESTSOURCES
-	basic_dma_test.c
-	mailbox.c
-	mem_utils.c
-	pi_board.c
+	basic_dma_test.cpp
+	mailbox.cpp
+	mem_utils.cpp
+	pi_board.cpp
 )
 # Set the build type to Debug 
-set(CMAKE_BUILD_TYPE Debug)
+if(NOT CMAKE_BUILD_TYPE) 
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
 
 # Set compiler flags for the Debug build type 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 
 # Add the executable
 add_executable(basic_dma_test ${BASICTESTSOURCES})
 
 target_link_libraries(basic_dma_test bcm_host)
-
-
-project(dma_test_blink_led)
-# Set the C standard
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED True)
-
-# Specify the source files
-set(BLINKLEDSOURCES
-	dma_test_blink_led.c
-	mailbox.c
-	mem_utils.c
-	pi_board.c
-)
-# Set the build type to Debug 
-set(CMAKE_BUILD_TYPE Debug)
-
-# Set compiler flags for the Debug build type 
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-
-
-# Add the executable
-add_executable(dma_test_blink_led ${BLINKLEDSOURCES})
-
-target_link_libraries(dma_test_blink_led bcm_host)
-
-
 
 
 

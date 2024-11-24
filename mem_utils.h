@@ -1,8 +1,12 @@
 #ifndef MEM_UTILS_H
 #define MEM_UTILS_H
 
-#include <stdio.h>
-#include <stdint.h>
+//#include <stdio.h>
+#include <cstdio>
+
+//#include <stdint.h>
+#include <cstdint>
+
 #include "mailbox.h"
 #include "pi_board.h"
 

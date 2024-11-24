@@ -2,8 +2,12 @@
 #define PI_BOARD_H
 
 
-#include <stdint.h>
-#include <stdio.h>
+//#include <stdint.h>
+#include <cstdint>
+
+//#include <stdio.h>
+#include <cstdio>
+
 #include "bcm_host.h"
 
 
