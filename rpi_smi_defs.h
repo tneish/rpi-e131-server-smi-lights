@@ -32,6 +32,10 @@
 // DMA request
 #define DMA_SMI_DREQ 4
 
+// Get virtual 8 and 32-bit pointers to register. Offset in bytes!
+#define REG8(virt, offset)  ((volatile uint8_t *) ((uintptr_t)(virt)+(offset)))
+#define REG32(virt, offset) ((volatile uint32_t *)((uintptr_t)(virt)+(offset)))
+
 // Union of 32-bit value with register bitfields
 #define REG_DEF(name, fields) typedef union {struct {volatile uint32_t fields;}; volatile uint32_t value;} name
 
@@ -96,5 +100,8 @@ REG_DEF(SMI_FLVL_REG, SMI_FLVL_FIELDS);
 
 #define CLK_SMI_CTL     0xb0
 #define CLK_SMI_DIV     0xb4
+
+
+
 
 // EOF

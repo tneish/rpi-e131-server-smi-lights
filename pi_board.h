@@ -13,6 +13,8 @@ struct board_cfg {
 	uint32_t periph_virt_size;
 	uint32_t dram_phys_base;
 	unsigned mem_flag;
+	int smi_timing[4];
+
 };
 
 void get_model_and_revision(struct board_cfg *board);
