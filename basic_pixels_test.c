@@ -55,11 +55,15 @@ TXDATA_T tx_buffer[TX_BUFF_LEN(CHAN_MAXLEDS)];  // Tx buffer for assembling data
 int rgb_data[CHAN_MAXLEDS][LED_NCHANS]; // RGB data
 
 // RGB values for test mode (1 value for each of 16 channels)
-int on_rgbs[16] = {0xff0000, 0x00ff00, 0x0000ff, 0xffffff,
+/*int on_rgbs[16] = {0xff0000, 0x00ff00, 0x0000ff, 0xffffff,
                   0xff4040, 0x40ff40, 0x4040ff, 0x404040,
                   0xff0000, 0x00ff00, 0x0000ff, 0xffffff,
-                  0xff4040, 0x40ff40, 0x4040ff, 0x404040};
-int off_rgbs[16];
+                  0xff4040, 0x40ff40, 0x4040ff, 0x404040};*/
+int on_rgbs[16] = {0xff0000, 0xff0000, 0xff0000, 0xff0000,
+                  0xff0000, 0xff0000, 0xff0000, 0xff0000,
+                  0xff0000, 0xff0000, 0xff0000, 0xff0000,
+                  0xff0000, 0xff0000, 0xff0000, 0xff0000};
+int off_rgbs[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 
 // Free memory segments and exit
@@ -127,11 +131,23 @@ int main() {
            chan_ledcount, chan_ledcount==1 ? "" : "s", LED_NCHANS);
     if (testmode) {
 	while (1) {
-	    for (int n=0; n<chan_ledcount; n++) {
-		rgb_txdata(n==oset%chan_ledcount ? on_rgbs : off_rgbs,
-                            &tx_buffer[LED_TX_OSET(n)]);
+	    //for (int n=0; n<chan_ledcount; n++) {
+		//rgb_txdata(n==oset%chan_ledcount ? on_rgbs : off_rgbs,
+                            //&tx_buffer[LED_TX_OSET(n)]);
+		///*rgb_txdata(on_rgbs,
+                            //&tx_buffer[LED_TX_OSET(n)]);*/
+	    //}
+	    if (oset % 2 == 0) {
+		for (int n = 0; n < 50; n++) {
+		    rgb_txdata(on_rgbs, &tx_buffer[LED_TX_OSET(n)]);
+		}
+	    } else {
+		for (int n = 0; n < 50; n++) {
+		    rgb_txdata(off_rgbs, &tx_buffer[LED_TX_OSET(n)]);
+		}
 	    }
-
+	    
+	    
             oset++;
 #if LED_NCHANS <= 8
             swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
@@ -141,7 +157,7 @@ int main() {
 	    txd = (TXDATA_T *)(cb+1);
             dm_safe_memcpy(txd, tx_buffer, TX_BUFF_SIZE(chan_ledcount));
             start_smi(m);
-            usleep(CHASE_MSEC * 1000);
+            usleep(CHASE_MSEC * 10000);
         }
     }
 
