@@ -63,9 +63,14 @@ const int chase_msec	= 100;	// Delay time for chaser light test
 TXDATA_T tx_test_data[] = {1, 2, 3, 4, 5, 6, 7, 0};
 #endif
 
-TXDATA_T *txd;                       // Pointer to uncached Tx data buffer
+TXDATA_T *txdata;                       // Pointer to uncached Tx data buffer
 
-TXDATA_T tx_buffer[TX_BUFF_LEN(CHAN_MAXLEDS)];  // Tx buffer for assembling data
+// Tx buffer for assembling data
+// As wide as number of channels (i.e. TXDATA_T = uint8_t for 8 channels)
+// As deep as number of LEDs in a channel (e.g. 50), multiplied by bits required
+// to encode RGB value on the wire (e.g. 4 pre-bits, 
+// then 3 bits for each bit in the 24-bit RGB value, then 4 post bits).
+TXDATA_T tx_buffer[TX_BUFF_LEN(CHAN_MAXLEDS)];  
 int rgb_data[CHAN_MAXLEDS][LED_NCHANS]; // RGB data
 
 // RGB values for test mode (1 value for each of 16 channels)
@@ -122,6 +127,30 @@ int max(int a, int b) {
     return (a > b) ? a : b; 
 }
 
+/* Interleave rgb data in rgb buffer
+ * src: TreeFrame_t with RGB values one channel at a time
+ * 	[chan1_0 .. chan1_n, 
+ * 	 chan2_0 .. chan2_n,
+ * 	 chanm_0 .. chanm_n]
+ * dst: TreeFrame_t with interleaved RGB values
+ * 	[chan1_0, chan2_0, chanm_0,
+ * 	 chan1_1, chan2_1, chanm_1,
+ * 	 chan1_n, chan2_n, chanm_n]
+ * 
+ * chans * leds_per_chan <= sizeof(TreeFrame_t->rgbs)
+ * 
+ */
+void interleave_rgbs(TreeFrame_t *dest, TreeFrame_t *src, int chans, int leds_per_chan) {
+    assert(chans * leds_per_chan <= sizeof(dest->rgbs));
+    
+    for (int i = 0; i < leds_per_chan; i++) {
+	for (int j = 0; j < chans; j++) {
+	    dest->rgbs[(i*chans)+j] = src->rgbs[(j*leds_per_chan)+i];
+	}
+    } 
+}
+
+
 int main() {
     const int chan_ledcount = 50;
     const int testmode = 1;
@@ -134,6 +163,7 @@ int main() {
     int num_rx = 0;
     uint64_t ts_source, ts_source_net, ts_sink, ts_sink_net;
     TreeFrame_t f = {0};
+    TreeFrame_t f_interleaved = {0};
     struct timespec ts;
     
     struct sockaddr_in addr; 
@@ -208,6 +238,7 @@ int main() {
 		    chans_sent_from_source * sizeof(uint32_t)) {
 		    fprintf(stderr, "Error: Packet too small (%u)\n", 
 			len);
+		    continue;
 			
 		}
 		
@@ -270,8 +301,10 @@ int main() {
 	}*/
 
 	
-	if (ring_buffer_is_empty(rb))
+	if (ring_buffer_is_empty(rb)) {
+	    // No frames waiting. Sleep on socket.
 	    goto idle_exit;
+	}
 	    
 	
 	TreeFrame_t *fptr = ring_buffer_peek(rb);
@@ -279,9 +312,30 @@ int main() {
 	// Pop buffered frames until current time
 	int iters = 0;
 	while (fptr->ts < timespec_to_ms(&ts)) {
+
 	    f = ring_buffer_get(rb); // Pop
-	    
+	    interleave_rgbs(&f_interleaved, &f, chans_sent_from_source, CHAN_MAXLEDS);
+
 	    // TODO: convert RGB data and send to smi
+	    for (int n=0; n<chan_ledcount; n++) {
+		rgb_txdata(&(f_interleaved.rgbs[n]), &tx_buffer[LED_TX_OSET(n)]);
+	    }
+#if LED_NCHANS <= 8
+	    swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
+#endif
+	    DMA_CB_t *cb=m_desc->virt_addr;
+	    txdata = (TXDATA_T *)(cb+1);
+	    dm_safe_memcpy(txdata, tx_buffer, TX_BUFF_SIZE(chan_ledcount));	    
+            //if (DEBUG) printf("TX_BUFF_SIZE(chan_ledcount) = %d\n", TX_BUFF_SIZE(chan_ledcount));
+
+	    // Send to SMI
+	    start_smi(m_desc);
+	    usleep(10);
+	    
+	    // TODO: How long to sleep for?
+	    while (dma_active()) {
+		usleep(10);
+	    }
 	    
 	    if (ring_buffer_is_empty(rb)) {
 		goto idle_exit;
@@ -290,6 +344,7 @@ int main() {
 	    fptr = ring_buffer_peek(rb);
 	    iters++;
 	    printf("pop iters = %d\n", iters);
+	    
 	    //if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
 		//perror("clock_gettime");
 		//break;
@@ -297,42 +352,17 @@ int main() {
 	}
 	
 	// Still frames in buffer but not to be displayed yet..
+	// Sleep until next frame is due; at least 5ms.
 	delta_timeout = max((fptr->ts - timespec_to_ms(&ts)), 5);
-	//fprintf(stderr, "delta_timeout = %d\n", fptr->ts - timespec_to_ms(&ts));
+	//if (DEBUG) fprintf(stderr, "delta_timeout = %d\n", fptr->ts - timespec_to_ms(&ts));
 	continue;
 	
+	// Sleep on socket
 	idle_exit:
 	delta_timeout = 100;
 	
 
     } // for each epoll event or timeout
-	
-	// Display pixels from buffer, until current time.
-
-	
-	
-	
-	
-	//for (int n=0; n<chan_ledcount; n++) {
-	    //rgb_txdata(n==oset%chan_ledcount ? on_rgbs : off_rgbs,
-			//&tx_buffer[LED_TX_OSET(n)]);
-	//}
-
-	//oset++;
-//#if LED_NCHANS <= 8
-	//swap_bytes(tx_buffer, TX_BUFF_SIZE(chan_ledcount));
-//#endif
-	//printf("TX_BUFF_SIZE(chan_ledcount) = %d\n", TX_BUFF_SIZE(chan_ledcount));
-	//DMA_CB_t *cb=m_desc->virt_addr;
-	//txd = (TXDATA_T *)(cb+1);
-	//dm_safe_memcpy(txd, tx_buffer, TX_BUFF_SIZE(chan_ledcount));
-	//start_smi(m_desc);
-	//usleep(CHASE_MSEC * 1000);
-    
-    
-    
-    
-
     
     close(sockfd);
     close(epollfd);
